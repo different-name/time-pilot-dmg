@@ -1,0 +1,1 @@
+bash.exe -c "make && bgb/bgb64.exe obj/timepilot.gb"
