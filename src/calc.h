@@ -2,10 +2,9 @@
 #define CALC_H
 
 #include <gb/gb.h>
+
 #include "main.h"
 
-#define FP_DIV(x, y) ((x) * FP_DECIMAL_FACTOR / (y))
-
-uint8_t angle_between_pos(Pos start, Pos target);
+int8_t direction_to_point(Point p1, Point p2);
 
 #endif
