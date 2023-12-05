@@ -6,36 +6,48 @@
 #include <stdio.h>
 
 #define SHIP_ROTATION_THRESHOLD 3
+#define ENEMY_COUNT 3
+#define BULLET_SPEED 2
 
 #define PLAYER_X 84
 #define PLAYER_Y 80
 
-#define SHIP_SPRITE_INDEX 0
-
-#define ENEMY_COUNT 3
+#define PLAYER_SPRITE_INDEX 0
+#define ENEMY_SPRITE_INDEX (PLAYER_SPRITE_INDEX + 1)
+#define BULLET_SPRITE_INDEX (ENEMY_SPRITE_INDEX + ENEMY_COUNT)
 
 #define MAX_ROTATION 16
-// For some reason, MAX_ROTATION / x has to be cast to a signed integer
-#define HALF_ROTATION (int8_t)(MAX_ROTATION / 2)
-#define QUARTER_ROTATION (int8_t)(MAX_ROTATION / 4)
+
+typedef struct {
+	int8_t x;
+	int8_t y;
+} Vector8;
 
 typedef struct {
 	uint8_t x;
 	uint8_t y;
-} Point2D;
-
-typedef Point2D Counter2D;
+} UVector8;
 
 typedef struct {
-	Point2D position;
-	uint8_t sprite_index;
+	uint16_t x;
+	uint16_t y;
+} UVector16;
+
+typedef struct {
+	UVector8 position;
+	uint8_t rotation;
 } GameObject;
 
 typedef struct {
 	GameObject gameObject;
 	uint8_t rotation_counter;
-	Counter2D movement_counter;
+	UVector16 movement_counter;
 } Ship;
+
+typedef struct {
+	GameObject gameObject;
+	uint8_t sprite_index;
+} Bullet;
 
 void init_gfx(void);
 void game_loop(void);

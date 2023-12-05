@@ -6,10 +6,12 @@
 #include "../res/sky_tiles.h"
 #include "calc.h"
 
-Player player;
+Ship player;
 int8_t joypad_state;
 
-Enemy enemies[ENEMY_COUNT];
+Ship enemies[ENEMY_COUNT];
+
+Vector8 world_movement;
 
 void main(void) {
 	init_gfx();
@@ -31,18 +33,18 @@ void init_gfx(void) {
 					 // [black, dark grey, white, white]
 					 // https://gbdev.gg8.se/forums/viewtopic.php?id=230
 	OBP1_REG = 0x2C;
-	set_sprite_data(SHIP_SPRITE_INDEX, MAX_ROTATION, ship_tiles);
-	set_sprite_tile(SHIP_SPRITE_INDEX, 0);
+	set_sprite_data(PLAYER_SPRITE_INDEX, MAX_ROTATION, ship_tiles);
+	set_sprite_tile(PLAYER_SPRITE_INDEX, 0);
 	player.gameObject.position.x = PLAYER_X;
 	player.gameObject.position.y = PLAYER_Y;
-	move_sprite(SHIP_SPRITE_INDEX, PLAYER_X, PLAYER_Y);
+	move_sprite(PLAYER_SPRITE_INDEX, PLAYER_X, PLAYER_Y);
 
 	for (uint8_t i = 0; i < ENEMY_COUNT; i++) {
-		set_sprite_tile(SHIP_SPRITE_INDEX + 1 + i, 0);
-		set_sprite_prop(SHIP_SPRITE_INDEX + 1 + i, S_PALETTE);
+		set_sprite_tile(ENEMY_SPRITE_INDEX + i, 0);
+		set_sprite_prop(ENEMY_SPRITE_INDEX + i, S_PALETTE);
 		enemies[i].gameObject.position.x = (i + 1) * 30;
 		enemies[i].gameObject.position.y = (i + 1) * 30;
-		move_sprite(SHIP_SPRITE_INDEX + 1 + i, enemies[i].gameObject.position.x,
+		move_sprite(ENEMY_SPRITE_INDEX + i, enemies[i].gameObject.position.x,
 					enemies[i].gameObject.position.y);
 	}
 
@@ -65,116 +67,119 @@ void game_loop(void) {
 void update_player_rotation(void) {
 	// Only update player rotation every n frames
 	if (player.rotation_counter < SHIP_ROTATION_THRESHOLD) {
-		player.rotation_counter += 1;
+		player.rotation_counter++;
 		return;
 	}
 
 	// Retrieve current direction the dpad is held in, -1 represents no input
 	int8_t target_direction = get_dpad_direction();
-	if (target_direction == -1) return;
+	if (target_direction == MAX_ROTATION) return; // Out of range if dpad not pressed
 
 	// The sprite_index represents the current rotation of the player
-	player.gameObject.sprite_index =
-			step_to_rotation(player.gameObject.sprite_index, target_direction);
-	set_sprite_tile(SHIP_SPRITE_INDEX, player.gameObject.sprite_index);
+	player.gameObject.rotation = step_to_rotation(player.gameObject.rotation, target_direction);
+	set_sprite_tile(PLAYER_SPRITE_INDEX, player.gameObject.rotation);
 
 	// Reset frame counter
 	player.rotation_counter = 0;
 }
 
-int8_t get_dpad_direction(void) {
+uint8_t get_dpad_direction(void) {
 	joypad_state = joypad();
 
 	if (joypad_state & J_UP) {
-		if (joypad_state & J_LEFT) return 14;
-		if (joypad_state & J_RIGHT) return 2;
+		if (joypad_state & J_LEFT) return MAX_ROTATION / 8 * 7;
+		if (joypad_state & J_RIGHT) return MAX_ROTATION / 8 * 1;
 		return 0;
 	} else if (joypad_state & J_DOWN) {
-		if (joypad_state & J_LEFT) return 10;
-		if (joypad_state & J_RIGHT) return 6;
-		return 8;
+		if (joypad_state & J_LEFT) return MAX_ROTATION / 8 * 5;
+		if (joypad_state & J_RIGHT) return MAX_ROTATION / 8 * 3;
+		return MAX_ROTATION / 8 * 4;
 	} else if (joypad_state & J_LEFT) {
-		return 12;
+		return MAX_ROTATION / 8 * 6;
 	} else if (joypad_state & J_RIGHT) {
-		return 4;
+		return MAX_ROTATION / 8 * 2;
 	}
 
-	return -1;
+	return MAX_ROTATION; // Out of range if dpad not pressed
 }
 
-// Scroll the world
 void update_player_position(void) {
-	player.gameObject.velocity =
-			velocity_from_rotation_and_distance(player.gameObject.sprite_index, 255);
+	// Scroll background by value calculated last frame
+	// This is done because updating enemy positions is slower than updating the background pos
+	scroll_bkg(world_movement.x, world_movement.y);
 
-	int16_t scroll_x = player.gameObject.velocity.x + player.pixel_offset.x; // Subpixels to scroll
-																			 // by
-	player.pixel_offset.x = scroll_x % 255; // Subpixel offset remainder
-	scroll_x /= 255;						// Whole pixels
+	UVector8 player_velocity = {0, 0};
+	player_velocity = velocity_from_rotation(player.gameObject.rotation);
 
-	int16_t scroll_y = player.gameObject.velocity.y + player.pixel_offset.y; // Subpixels to scroll
-																			 // by
-	player.pixel_offset.y = scroll_y % 255; // Subpixel offset remainder
-	scroll_y /= 255;						// Whole pixels
+	// Check if supposed to move on a given axis this frame
+	if (player.gameObject.rotation % 4 == 2) { // If player is facing diagonally
+		// Sync x and y movement counters
+		if (player.movement_counter.x != player.movement_counter.y) {
+			uint8_t average = (player.movement_counter.x + player.movement_counter.y) / 2;
+			player.movement_counter.x = average;
+			player.movement_counter.y = average;
+		}
 
-	// Averaging x and y movement if travelling diagonally, reduces stair effect
-	if (player.gameObject.sprite_index % QUARTER_ROTATION == 2) {
-		int16_t average = (abs(player.pixel_offset.x) + abs(player.pixel_offset.y)) / 2;
-		// Maintain direction of movement
-		player.pixel_offset.x = player.pixel_offset.x < 0 ? -average : average;
-		player.pixel_offset.y = player.pixel_offset.y < 0 ? -average : average;
+		// Perform movement, only with x. y will be synced afterwards to save resources
+		player.movement_counter.x += player_velocity.x;
+
+		if (player.movement_counter.x > 255) {
+			player.movement_counter.x -= 255;
+			world_movement.x = 1;
+			world_movement.y = 1;
+		} else {
+			world_movement.x = 0;
+			world_movement.y = 0;
+		}
+
+		player.movement_counter.y = player.movement_counter.x;
+	} else {
+		player.movement_counter.x += player_velocity.x;
+		if (player.movement_counter.x > 255) {
+			player.movement_counter.x -= 255;
+			world_movement.x = 1;
+		} else {
+			world_movement.x = 0;
+		}
+
+		player.movement_counter.y += player_velocity.y;
+		if (player.movement_counter.y > 255) {
+			player.movement_counter.y -= 255;
+			world_movement.y = 1;
+		} else {
+			world_movement.y = 0;
+		}
 	}
 
-	scroll_bkg(scroll_x, scroll_y);
+	world_movement.x *= player.gameObject.rotation < 8 ? 1 : -1;
+	world_movement.y *= player.gameObject.rotation < 12 && player.gameObject.rotation > 4 ? 1 : -1;
+
+	for (uint8_t i = 0; i < ENEMY_COUNT; i++) {
+		enemies[i].gameObject.position.x -= world_movement.x;
+		enemies[i].gameObject.position.y -= world_movement.y;
+		move_sprite(ENEMY_SPRITE_INDEX + i, enemies[i].gameObject.position.x,
+					enemies[i].gameObject.position.y);
+	}
 }
 
 void update_enemy_rotation(uint8_t index) {
-	// Only update enemy rotation every n frames
-	if (enemies[index].rotation_counter < SHIP_ROTATION_THRESHOLD) {
-		enemies[index].rotation_counter += 1;
-		return;
-	}
-
-	// Retrieve current direction the enemy is in
-	int8_t target_direction =
-			direction_to_point(enemies[index].gameObject.position, player.gameObject.position);
-
-	// The sprite_index represents the current rotation of the enemy
-	enemies[index].gameObject.sprite_index =
-			step_to_rotation(enemies[index].gameObject.sprite_index, target_direction);
-	set_sprite_tile(SHIP_SPRITE_INDEX + 1 + index, enemies[index].gameObject.sprite_index);
-
-	// Reset frame counter
-	enemies[index].rotation_counter = 0;
-}
-
-void update_enemy_position(uint8_t index) {
-	enemies[index].gameObject.velocity =
-			velocity_from_rotation_and_distance(enemies[index].gameObject.sprite_index, 255);
-
-	enemies[index].gameObject.position.x += enemies[index].gameObject.velocity.x;
-	enemies[index].gameObject.position.y += enemies[index].gameObject.velocity.y;
-
-	move_sprite(index + 1, enemies[index].gameObject.position.x / 255,
-				enemies[index].gameObject.position.y / 255);
-
-	// int16_t scroll_x = player.gameObject.velocity.x + player.pixel_offset.x; // Subpixels to
-	// scroll
-	// 																		 // by
-	// player.pixel_offset.x = scroll_x % 255; // Subpixel offset remainder
-	// scroll_x /= 255;						// Whole pixels
-
-	// int16_t scroll_y = player.gameObject.velocity.y + player.pixel_offset.y; // Subpixels to
-	// scroll
-	// 																		 // by
-	// player.pixel_offset.y = scroll_y % 255; // Subpixel offset remainder
-	// scroll_y /= 255;						// Whole pixels
-
-	// // Averaging x and y movement if travelling diagonally, reduces stair effect
-	// if (player.gameObject.sprite_index % QUARTER_ROTATION == 2) {
-	// 	int16_t average = (abs(player.pixel_offset.x) + abs(player.pixel_offset.y)) / 2;
-	// 	// Maintain direction of movement
-	// 	player.pixel_offset.x = player.pixel_offset.x < 0 ? -average : average;
-	// 	player.pixel_offset.y = player.pixel_offset.y < 0 ? -average : average;
+	// // Only update enemy rotation every n frames
+	// if (enemies[index].rotation_counter < SHIP_ROTATION_THRESHOLD) {
+	// 	enemies[index].rotation_counter += 1;
+	// 	return;
 	// }
+
+	// // Retrieve current direction the enemy is in
+	// int8_t target_direction =
+	// 		direction_to_point(enemies[index].gameObject.position, player.gameObject.position);
+
+	// // The sprite_index represents the current rotation of the enemy
+	// enemies[index].gameObject.rotation =
+	// 		step_to_rotation(enemies[index].gameObject.rotation, target_direction);
+	// set_sprite_tile(ENEMY_SPRITE_INDEX + index, enemies[index].gameObject.rotation);
+
+	// // Reset frame counter
+	// enemies[index].rotation_counter = 0;
 }
+
+void update_enemy_position(uint8_t index) {}
