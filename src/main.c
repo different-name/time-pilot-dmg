@@ -119,6 +119,9 @@ void game_loop(void) {
 		if ((frame_counter + i) % 2 == 0) { // Update position every 2 frames
 			update_enemy_position(&enemies[i]);
 		}
+		if ((frame_counter + i * 128) == 0) {
+			spawn_bullet(&enemies[i], enemy_bullets, false);
+		}
 	}
 
 	for (uint8_t i = 0; i < PLAYER_BULLET_COUNT; i++) {
