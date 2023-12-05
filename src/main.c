@@ -15,6 +15,9 @@ bool paused = false;
 
 Ship enemies[ENEMY_COUNT];
 
+GameObject player_bullets[PLAYER_BULLET_COUNT];
+GameObject enemy_bullets[ENEMY_BULLET_COUNT];
+
 Vector8 world_movement;
 
 void main(void) {
@@ -44,26 +47,58 @@ void init_gfx(void) {
 	set_bkg_data(0, 19u, sky_tiles);
 	set_bkg_tiles(0, 0, sky_mapWidth, sky_mapHeight, sky_mapPLN0);
 
-	// Load ship
+	// Load sprite tiles
+	set_sprite_data(0, MAX_ROTATION, ship_tiles);
+	set_sprite_data(MAX_ROTATION + 1, 1, bullet_tiles);
+
+	// Load player
 	OBP0_REG = 0xE0; // Updating sprite color palette to
 					 // [black, dark grey, white, white]
 					 // https://gbdev.gg8.se/forums/viewtopic.php?id=230
 	OBP1_REG = 0x2C;
-	set_sprite_data(PLAYER_SPRITE_INDEX, MAX_ROTATION, ship_tiles);
 	set_sprite_tile(PLAYER_SPRITE_INDEX, 0);
 	player.gameObject.position.x = PLAYER_X;
 	player.gameObject.position.y = PLAYER_Y;
+	player.gameObject.enabled = true;
 	move_sprite(PLAYER_SPRITE_INDEX, PLAYER_X, PLAYER_Y);
 
+	// Load enemies
 	for (uint8_t i = 0; i < ENEMY_COUNT; i++) {
 		set_sprite_tile(ENEMY_SPRITE_INDEX + i, 0);
 		set_sprite_prop(ENEMY_SPRITE_INDEX + i, S_PALETTE);
+
+		enemies[i].gameObject.enabled = true;
+
 		enemies[i].gameObject.position.x = (i + 1) * 30;
 		enemies[i].gameObject.position.y = (i + 1) * 30;
-		enemies[i].movement_counter.x = i;
-		enemies[i].movement_counter.y = i;
+
 		move_sprite(ENEMY_SPRITE_INDEX + i, enemies[i].gameObject.position.x,
 					enemies[i].gameObject.position.y);
+	}
+
+	// Load player bullets
+	for (uint8_t i = 0; i < PLAYER_BULLET_COUNT; i++) {
+		set_sprite_tile(BULLET_SPRITE_INDEX + i, MAX_ROTATION + 1);
+
+		player_bullets[i].enabled = false;
+
+		player_bullets[i].position.x = PLAYER_X;
+		player_bullets[i].position.y = PLAYER_Y - i * 5 - 8;
+
+		move_sprite(BULLET_SPRITE_INDEX + i, player_bullets[i].position.x,
+					player_bullets[i].position.y);
+	}
+
+	// Load player bullets
+	for (uint8_t i = 0; i < ENEMY_BULLET_COUNT; i++) {
+		set_sprite_tile(BULLET_SPRITE_INDEX + PLAYER_BULLET_COUNT + i, MAX_ROTATION + 1);
+		set_sprite_prop(BULLET_SPRITE_INDEX + PLAYER_BULLET_COUNT + i, S_PALETTE);
+
+		enemy_bullets[i].position.x = PLAYER_X - i * 5 - 8;
+		enemy_bullets[i].position.y = PLAYER_Y;
+
+		move_sprite(BULLET_SPRITE_INDEX + PLAYER_BULLET_COUNT + i, enemy_bullets[i].position.x,
+					enemy_bullets[i].position.y);
 	}
 
 	// Turn the background map, sprites and display on

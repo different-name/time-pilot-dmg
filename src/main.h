@@ -6,8 +6,9 @@
 #include <stdio.h>
 
 #define SHIP_ROTATION_THRESHOLD 3
-#define ENEMY_COUNT 3
-#define BULLET_SPEED 2
+#define ENEMY_COUNT 4
+#define PLAYER_BULLET_COUNT 5
+#define ENEMY_BULLET_COUNT 5
 
 #define PLAYER_X 84
 #define PLAYER_Y 80
@@ -36,6 +37,7 @@ typedef struct {
 typedef struct {
 	UVector8 position;
 	uint8_t rotation;
+	bool enabled;
 } GameObject;
 
 typedef struct {
@@ -43,11 +45,6 @@ typedef struct {
 	uint8_t rotation_counter;
 	UVector16 movement_counter;
 } Ship;
-
-typedef struct {
-	GameObject gameObject;
-	uint8_t sprite_index;
-} Bullet;
 
 void init_gfx(void);
 void game_loop(void);
