@@ -13,4 +13,6 @@ uint8_t step_to_rotation(int8_t r1, int8_t r2);
 
 UVector8 velocity_from_rotation(uint8_t rotation);
 
+Vector8 movement_from_velocity(Ship* ship);
+
 #endif

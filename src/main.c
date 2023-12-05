@@ -7,7 +7,11 @@
 #include "calc.h"
 
 Ship player;
-int8_t joypad_state;
+uint8_t joypad_state = 0;
+uint8_t last_joypad_state = 0;
+
+uint8_t frame_counter = 0;
+bool paused = false;
 
 Ship enemies[ENEMY_COUNT];
 
@@ -17,7 +21,19 @@ void main(void) {
 	init_gfx();
 
 	while (1) {
-		game_loop();
+		joypad_state = joypad();
+
+		if ((joypad_state & J_START) && !(last_joypad_state & J_START)) {
+			paused = !paused;
+		}
+
+		if (!paused) {
+			game_loop();
+		}
+
+		last_joypad_state = joypad_state;
+		frame_counter++;
+
 		// Done processing, yield CPU and wait for start of next frame
 		wait_vbl_done();
 	}
@@ -44,6 +60,8 @@ void init_gfx(void) {
 		set_sprite_prop(ENEMY_SPRITE_INDEX + i, S_PALETTE);
 		enemies[i].gameObject.position.x = (i + 1) * 30;
 		enemies[i].gameObject.position.y = (i + 1) * 30;
+		enemies[i].movement_counter.x = i;
+		enemies[i].movement_counter.y = i;
 		move_sprite(ENEMY_SPRITE_INDEX + i, enemies[i].gameObject.position.x,
 					enemies[i].gameObject.position.y);
 	}
@@ -59,8 +77,11 @@ void game_loop(void) {
 	update_player_position();
 
 	for (uint8_t i = 0; i < ENEMY_COUNT; i++) {
-		update_enemy_rotation(i);
-		update_enemy_position(i);
+		if ((frame_counter + i) % 3 == 0) { // Update rotation every 3rd frame
+			update_enemy_rotation(i);
+		} else { // Update position every frame except third
+			update_enemy_position(i);
+		}
 	}
 }
 
@@ -84,8 +105,6 @@ void update_player_rotation(void) {
 }
 
 uint8_t get_dpad_direction(void) {
-	joypad_state = joypad();
-
 	if (joypad_state & J_UP) {
 		if (joypad_state & J_LEFT) return MAX_ROTATION / 8 * 7;
 		if (joypad_state & J_RIGHT) return MAX_ROTATION / 8 * 1;
@@ -108,51 +127,7 @@ void update_player_position(void) {
 	// This is done because updating enemy positions is slower than updating the background pos
 	scroll_bkg(world_movement.x, world_movement.y);
 
-	UVector8 player_velocity = {0, 0};
-	player_velocity = velocity_from_rotation(player.gameObject.rotation);
-
-	// Check if supposed to move on a given axis this frame
-	if (player.gameObject.rotation % 4 == 2) { // If player is facing diagonally
-		// Sync x and y movement counters
-		if (player.movement_counter.x != player.movement_counter.y) {
-			uint8_t average = (player.movement_counter.x + player.movement_counter.y) / 2;
-			player.movement_counter.x = average;
-			player.movement_counter.y = average;
-		}
-
-		// Perform movement, only with x. y will be synced afterwards to save resources
-		player.movement_counter.x += player_velocity.x;
-
-		if (player.movement_counter.x > 255) {
-			player.movement_counter.x -= 255;
-			world_movement.x = 1;
-			world_movement.y = 1;
-		} else {
-			world_movement.x = 0;
-			world_movement.y = 0;
-		}
-
-		player.movement_counter.y = player.movement_counter.x;
-	} else {
-		player.movement_counter.x += player_velocity.x;
-		if (player.movement_counter.x > 255) {
-			player.movement_counter.x -= 255;
-			world_movement.x = 1;
-		} else {
-			world_movement.x = 0;
-		}
-
-		player.movement_counter.y += player_velocity.y;
-		if (player.movement_counter.y > 255) {
-			player.movement_counter.y -= 255;
-			world_movement.y = 1;
-		} else {
-			world_movement.y = 0;
-		}
-	}
-
-	world_movement.x *= player.gameObject.rotation < 8 ? 1 : -1;
-	world_movement.y *= player.gameObject.rotation < 12 && player.gameObject.rotation > 4 ? 1 : -1;
+	world_movement = movement_from_velocity(&player);
 
 	for (uint8_t i = 0; i < ENEMY_COUNT; i++) {
 		enemies[i].gameObject.position.x -= world_movement.x;
@@ -163,23 +138,25 @@ void update_player_position(void) {
 }
 
 void update_enemy_rotation(uint8_t index) {
-	// // Only update enemy rotation every n frames
-	// if (enemies[index].rotation_counter < SHIP_ROTATION_THRESHOLD) {
-	// 	enemies[index].rotation_counter += 1;
-	// 	return;
-	// }
+	UVector8 enemy_position = {0, 0};
+	enemy_position = enemies[index].gameObject.position;
+	UVector8 player_position = {0, 0};
+	player_position = player.gameObject.position;
 
-	// // Retrieve current direction the enemy is in
-	// int8_t target_direction =
-	// 		direction_to_point(enemies[index].gameObject.position, player.gameObject.position);
+	// Retrieve current direction the enemy is in
+	int8_t target_direction = direction_to_point(enemy_position, player_position);
 
-	// // The sprite_index represents the current rotation of the enemy
-	// enemies[index].gameObject.rotation =
-	// 		step_to_rotation(enemies[index].gameObject.rotation, target_direction);
-	// set_sprite_tile(ENEMY_SPRITE_INDEX + index, enemies[index].gameObject.rotation);
-
-	// // Reset frame counter
-	// enemies[index].rotation_counter = 0;
+	// The sprite_index represents the current rotation of the enemy
+	enemies[index].gameObject.rotation =
+			step_to_rotation(enemies[index].gameObject.rotation, target_direction);
+	set_sprite_tile(ENEMY_SPRITE_INDEX + index, enemies[index].gameObject.rotation);
 }
 
-void update_enemy_position(uint8_t index) {}
+void update_enemy_position(uint8_t index) {
+	Vector8 enemy_movement = {0, 0};
+	enemy_movement = movement_from_velocity(&enemies[index]);
+	enemies[index].gameObject.position.x += enemy_movement.x;
+	enemies[index].gameObject.position.y += enemy_movement.y;
+	move_sprite(ENEMY_SPRITE_INDEX + index, enemies[index].gameObject.position.x,
+				enemies[index].gameObject.position.y);
+}

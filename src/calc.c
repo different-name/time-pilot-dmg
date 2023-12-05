@@ -33,7 +33,7 @@ uint8_t direction_to_point(UVector8 p1, UVector8 p2) {
 	// approximation, check against pre-calculated values)
 	direction += (slope >= 20) + (slope >= 67) + (slope >= 150) + (slope >= 503);
 
-	return direction;
+	return direction % 16;
 }
 
 // Increments / decrements rotation by 1 toward target rotation
@@ -52,4 +52,49 @@ UVector8 velocity_from_rotation(uint8_t rotation) {
 	velocity.x = VELOCITIES[rotation % (MAX_ROTATION / 2)]; // Use velocity lookup table
 	velocity.y = VELOCITIES[(rotation + (MAX_ROTATION / 4)) % (MAX_ROTATION / 2)];
 	return velocity;
+}
+
+Vector8 movement_from_velocity(Ship* ship) {
+	Vector8 ship_movement = {0, 0};
+
+	UVector8 ship_velocity = {0, 0};
+	ship_velocity = velocity_from_rotation(ship->gameObject.rotation);
+
+	// Check if supposed to move on a given axis this frame
+	if (ship->gameObject.rotation % 4 == 2) { // If player is facing diagonally
+		// Sync x and y movement counters
+		if (ship->movement_counter.x != ship->movement_counter.y) {
+			uint8_t average = (ship->movement_counter.x + ship->movement_counter.y) / 2;
+			ship->movement_counter.x = average;
+			ship->movement_counter.y = average;
+		}
+
+		// Perform movement only with x. y will be synced afterwards to save resources
+		ship->movement_counter.x += ship_velocity.x;
+
+		if (ship->movement_counter.x > 255) {
+			ship->movement_counter.x -= 255;
+			ship_movement.x = 1;
+			ship_movement.y = 1;
+		}
+
+		ship->movement_counter.y = ship->movement_counter.x;
+	} else {
+		ship->movement_counter.x += ship_velocity.x;
+		if (ship->movement_counter.x > 255) {
+			ship->movement_counter.x -= 255;
+			ship_movement.x = 1;
+		}
+
+		ship->movement_counter.y += ship_velocity.y;
+		if (ship->movement_counter.y > 255) {
+			ship->movement_counter.y -= 255;
+			ship_movement.y = 1;
+		}
+	}
+
+	ship_movement.x *= ship->gameObject.rotation < 8 ? 1 : -1;
+	ship_movement.y *= ship->gameObject.rotation < 12 && ship->gameObject.rotation > 4 ? 1 : -1;
+
+	return ship_movement;
 }
