@@ -7,21 +7,21 @@
 const uint8_t VELOCITIES[8] = {0, 98, 180, 236, 255, 236, 180, 98};
 
 // Calculates the direction between two points
-uint8_t direction_to_point(UVector8 p1, UVector8 p2) {
-	if (p1.x == p2.x) { // x coordinate is same
+uint8_t direction_to_point(UVector8* p1, UVector8* p2) {
+	if (p1->x == p2->x) { // x coordinate is same
 		// Point up or down
-		return (p1.y < p2.y) * (MAX_ROTATION / 2);
+		return (p1->y < p2->y) * (MAX_ROTATION / 2);
 	}
-	if (p1.y == p2.y) { // y coordinate is same
+	if (p1->y == p2->y) { // y coordinate is same
 		// Point right or left
-		return (p1.x > p2.x) * (MAX_ROTATION / 2) + (MAX_ROTATION / 4);
+		return (p1->x > p2->x) * (MAX_ROTATION / 2) + (MAX_ROTATION / 4);
 	}
 
-	uint8_t dx = (p1.x > p2.x) ? p1.x - p2.x : p2.x - p1.x; // x distance between p1 and p2
-	uint8_t dy = (p1.y > p2.y) ? p1.y - p2.y : p2.y - p1.y; // y distance between p1 and p2
+	uint8_t dx = (p1->x > p2->x) ? p1->x - p2->x : p2->x - p1->x; // x distance between p1 and p2
+	uint8_t dy = (p1->y > p2->y) ? p1->y - p2->y : p2->y - p1->y; // y distance between p1 and p2
 
-	uint8_t left = p2.x < p1.x;	 // Target x is less than start x (target left of start)
-	uint8_t below = p2.y > p1.y; // Target y is greater than start y (target below start)
+	uint8_t left = p2->x < p1->x;  // Target x is less than start x (target left of start)
+	uint8_t below = p2->y > p1->y; // Target y is greater than start y (target below start)
 
 	// Calculating direction first as the quadrant, which will be incremented by the slope
 	int8_t direction = ((left << 1) | (left ^ below)) * (MAX_ROTATION / 4);
@@ -54,47 +54,47 @@ UVector8 velocity_from_rotation(uint8_t rotation) {
 	return velocity;
 }
 
-Vector8 movement_from_velocity(Ship* ship) {
-	Vector8 ship_movement = {0, 0};
+Vector8 movement_from_velocity(GameObject* gameObject) {
+	Vector8 gameObject_movement = {0, 0};
 
-	UVector8 ship_velocity = {0, 0};
-	ship_velocity = velocity_from_rotation(ship->gameObject.rotation);
+	UVector8 gameObject_velocity = {0, 0};
+	gameObject_velocity = velocity_from_rotation(gameObject->rotation);
 
 	// Check if supposed to move on a given axis this frame
-	if (ship->gameObject.rotation % 4 == 2) { // If player is facing diagonally
+	if (gameObject->rotation % 4 == 2) { // If player is facing diagonally
 		// Sync x and y movement counters
-		if (ship->movement_counter.x != ship->movement_counter.y) {
-			uint8_t average = (ship->movement_counter.x + ship->movement_counter.y) / 2;
-			ship->movement_counter.x = average;
-			ship->movement_counter.y = average;
+		if (gameObject->movement_counter.x != gameObject->movement_counter.y) {
+			uint8_t average = (gameObject->movement_counter.x + gameObject->movement_counter.y) / 2;
+			gameObject->movement_counter.x = average;
+			gameObject->movement_counter.y = average;
 		}
 
 		// Perform movement only with x. y will be synced afterwards to save resources
-		ship->movement_counter.x += ship_velocity.x;
+		gameObject->movement_counter.x += gameObject_velocity.x;
 
-		if (ship->movement_counter.x > 255) {
-			ship->movement_counter.x -= 255;
-			ship_movement.x = 1;
-			ship_movement.y = 1;
+		if (gameObject->movement_counter.x > 255) {
+			gameObject->movement_counter.x -= 255;
+			gameObject_movement.x = 1;
+			gameObject_movement.y = 1;
 		}
 
-		ship->movement_counter.y = ship->movement_counter.x;
+		gameObject->movement_counter.y = gameObject->movement_counter.x;
 	} else {
-		ship->movement_counter.x += ship_velocity.x;
-		if (ship->movement_counter.x > 255) {
-			ship->movement_counter.x -= 255;
-			ship_movement.x = 1;
+		gameObject->movement_counter.x += gameObject_velocity.x;
+		if (gameObject->movement_counter.x > 255) {
+			gameObject->movement_counter.x -= 255;
+			gameObject_movement.x = 1;
 		}
 
-		ship->movement_counter.y += ship_velocity.y;
-		if (ship->movement_counter.y > 255) {
-			ship->movement_counter.y -= 255;
-			ship_movement.y = 1;
+		gameObject->movement_counter.y += gameObject_velocity.y;
+		if (gameObject->movement_counter.y > 255) {
+			gameObject->movement_counter.y -= 255;
+			gameObject_movement.y = 1;
 		}
 	}
 
-	ship_movement.x *= ship->gameObject.rotation < 8 ? 1 : -1;
-	ship_movement.y *= ship->gameObject.rotation < 12 && ship->gameObject.rotation > 4 ? 1 : -1;
+	gameObject_movement.x *= gameObject->rotation < 8 ? 1 : -1;
+	gameObject_movement.y *= gameObject->rotation < 12 && gameObject->rotation > 4 ? 1 : -1;
 
-	return ship_movement;
+	return gameObject_movement;
 }
