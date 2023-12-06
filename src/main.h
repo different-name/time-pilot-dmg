@@ -6,7 +6,7 @@
 #include <stdio.h>
 
 #define SHIP_ROTATION_THRESHOLD 2
-#define ENEMY_COUNT 2
+#define ENEMY_COUNT 4
 #define PLAYER_BULLET_COUNT 3
 #define ENEMY_BULLET_COUNT 5
 

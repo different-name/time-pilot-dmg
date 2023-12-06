@@ -65,39 +65,44 @@ void init_gfx(void) {
 
 	// Load enemies
 	for (uint8_t i = 0; i < ENEMY_COUNT; i++) {
-		enemies[i].sprite_index = ENEMY_SPRITE_INDEX + i;
-		enemies[i].enabled = true;
-		enemies[i].position.x = (i + 1) * 30;
-		enemies[i].position.y = (i + 1) * 30;
+		GameObject* enemy = &enemies[i];
 
-		set_sprite_tile(enemies[i].sprite_index, 0);
-		set_sprite_prop(enemies[i].sprite_index, S_PALETTE);
-		move_sprite(enemies[i].sprite_index, enemies[i].position.x, enemies[i].position.y);
+		enemy->sprite_index = ENEMY_SPRITE_INDEX + i;
+		enemy->enabled = true;
+		enemy->position.x = (i + 1) * 30;
+		enemy->position.y = (i + 1) * 30;
+
+		set_sprite_tile(enemy->sprite_index, 0);
+		set_sprite_prop(enemy->sprite_index, S_PALETTE);
+		move_sprite(enemy->sprite_index, enemy->position.x, enemy->position.y);
 	}
 
 	// Load player bullets
 	for (uint8_t i = 0; i < PLAYER_BULLET_COUNT; i++) {
-		player_bullets[i].sprite_index = BULLET_SPRITE_INDEX + i;
-		player_bullets[i].enabled = false;
-		player_bullets[i].position.x = 0;
-		player_bullets[i].position.y = 0;
+		GameObject* player_bullet = &player_bullets[i];
 
-		set_sprite_tile(player_bullets[i].sprite_index, MAX_ROTATION + 1);
-		move_sprite(player_bullets[i].sprite_index, player_bullets[i].position.x,
-					player_bullets[i].position.y);
+		player_bullet->sprite_index = BULLET_SPRITE_INDEX + i;
+		player_bullet->enabled = false;
+		player_bullet->position.x = 0;
+		player_bullet->position.y = 0;
+
+		set_sprite_tile(player_bullet->sprite_index, MAX_ROTATION + 1);
+		move_sprite(player_bullet->sprite_index, player_bullets->position.x,
+					player_bullet->position.y);
 	}
 
 	// Load player bullets
 	for (uint8_t i = 0; i < ENEMY_BULLET_COUNT; i++) {
-		enemy_bullets[i].sprite_index = BULLET_SPRITE_INDEX + PLAYER_BULLET_COUNT + i;
-		enemy_bullets[i].enabled = false;
-		enemy_bullets[i].position.x = 0;
-		enemy_bullets[i].position.y = 0;
+		GameObject* enemy_bullet = &enemy_bullets[i];
 
-		set_sprite_tile(enemy_bullets[i].sprite_index, MAX_ROTATION + 1);
-		set_sprite_prop(enemy_bullets[i].sprite_index, S_PALETTE);
-		move_sprite(enemy_bullets[i].sprite_index, enemy_bullets[i].position.x,
-					enemy_bullets[i].position.y);
+		enemy_bullet->sprite_index = BULLET_SPRITE_INDEX + PLAYER_BULLET_COUNT + i;
+		enemy_bullet->enabled = false;
+		enemy_bullet->position.x = 0;
+		enemy_bullet->position.y = 0;
+
+		set_sprite_tile(enemy_bullet->sprite_index, MAX_ROTATION + 1);
+		set_sprite_prop(enemy_bullet->sprite_index, S_PALETTE);
+		move_sprite(enemy_bullet->sprite_index, enemy_bullet->position.x, enemy_bullet->position.y);
 	}
 
 	// Turn the background map, sprites and display on
@@ -237,7 +242,6 @@ void spawn_bullet(GameObject* ship, GameObject bullets[], bool friendly) {
 		bullets[i].enabled = true;
 
 		// We don't move the sprite so it will show next frame further from the ship
-
 		return;
 	}
 }
