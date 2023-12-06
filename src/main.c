@@ -6,7 +6,6 @@
 #include "../res/sky_tiles.h"
 #include "calc.h"
 
-uint8_t frame_counter = 0;
 uint8_t joypad_state = 0;
 uint8_t last_joypad_state = 0;
 bool paused = false;
@@ -33,7 +32,6 @@ void main(void) {
 		}
 
 		last_joypad_state = joypad_state;
-		frame_counter++;
 
 		// Done processing, yield CPU and wait for start of next frame
 		wait_vbl_done();
@@ -46,8 +44,8 @@ void init_gfx(void) {
 	set_bkg_tiles(0, 0, sky_mapWidth, sky_mapHeight, sky_mapPLN0);
 
 	// Load sprite tiles
-	set_sprite_data(0, MAX_ROTATION, ship_tiles);
-	set_sprite_data(MAX_ROTATION + 1, 1, bullet_tiles);
+	set_sprite_data(0, 16, ship_tiles);
+	set_sprite_data(16 + 1, 1, bullet_tiles);
 
 	OBP0_REG = 0xE0; // Updating sprite color palette to
 					 // [black, dark grey, white, white]
@@ -86,7 +84,7 @@ void init_gfx(void) {
 		player_bullet->position.x = 0;
 		player_bullet->position.y = 0;
 
-		set_sprite_tile(player_bullet->sprite_index, MAX_ROTATION + 1);
+		set_sprite_tile(player_bullet->sprite_index, 16 + 1);
 		move_sprite(player_bullet->sprite_index, player_bullets->position.x,
 					player_bullet->position.y);
 	}
@@ -100,7 +98,7 @@ void init_gfx(void) {
 		enemy_bullet->position.x = 0;
 		enemy_bullet->position.y = 0;
 
-		set_sprite_tile(enemy_bullet->sprite_index, MAX_ROTATION + 1);
+		set_sprite_tile(enemy_bullet->sprite_index, 16 + 1);
 		set_sprite_prop(enemy_bullet->sprite_index, S_PALETTE);
 		move_sprite(enemy_bullet->sprite_index, enemy_bullet->position.x, enemy_bullet->position.y);
 	}
@@ -118,13 +116,13 @@ void game_loop(void) {
 	for (uint8_t i = 0; i < ENEMY_COUNT; i++) {
 		if (!enemies[i].enabled) continue; // Don't process enemy if disabled
 
-		if ((frame_counter + i) % 5 == 0) { // Update rotation every 4rd frame
+		if ((sys_time + i) % 4 == 0) { // Update rotation every 5 frames
 			update_enemy_rotation(&enemies[i]);
 		}
-		if ((frame_counter + i) % 2 == 0) { // Update position every 2 frames
+		if ((sys_time + i) % 2 == 0) { // Update position every 2 frames
 			update_enemy_position(&enemies[i]);
 		}
-		if ((frame_counter + i * 128) == 0) {
+		if ((sys_time + i * 64) % 256 == 0) { // Shoot every 256 frames
 			spawn_bullet(&enemies[i], enemy_bullets, false);
 		}
 	}
@@ -148,7 +146,7 @@ void update_player_rotation(void) {
 
 	// Retrieve current direction the dpad is held in, -1 represents no input
 	int8_t target_direction = get_dpad_direction();
-	if (target_direction == MAX_ROTATION) return; // Out of range if dpad not pressed
+	if (target_direction == 16) return; // Out of range if dpad not pressed
 
 	// The sprite_index represents the current rotation of the player
 	player.gameObject.rotation = step_to_rotation(player.gameObject.rotation, target_direction);
@@ -160,20 +158,20 @@ void update_player_rotation(void) {
 
 uint8_t get_dpad_direction(void) {
 	if (joypad_state & J_UP) {
-		if (joypad_state & J_LEFT) return MAX_ROTATION / 8 * 7;
-		if (joypad_state & J_RIGHT) return MAX_ROTATION / 8 * 1;
+		if (joypad_state & J_LEFT) return 14;
+		if (joypad_state & J_RIGHT) return 2;
 		return 0;
 	} else if (joypad_state & J_DOWN) {
-		if (joypad_state & J_LEFT) return MAX_ROTATION / 8 * 5;
-		if (joypad_state & J_RIGHT) return MAX_ROTATION / 8 * 3;
-		return MAX_ROTATION / 8 * 4;
+		if (joypad_state & J_LEFT) return 10;
+		if (joypad_state & J_RIGHT) return 6;
+		return 8;
 	} else if (joypad_state & J_LEFT) {
-		return MAX_ROTATION / 8 * 6;
+		return 12;
 	} else if (joypad_state & J_RIGHT) {
-		return MAX_ROTATION / 8 * 2;
+		return 4;
 	}
 
-	return MAX_ROTATION; // Out of range if dpad not pressed
+	return 16; // Out of range if dpad not pressed
 }
 
 void update_player_position(void) {
@@ -181,28 +179,31 @@ void update_player_position(void) {
 	// This is done because updating enemy positions is slower than updating the background pos
 	scroll_bkg(world_movement.x, world_movement.y);
 
-	world_movement = movement_from_velocity(&(player.gameObject));
+	movement_from_velocity(&(player.gameObject), &world_movement);
 
 	for (uint8_t i = 0; i < ENEMY_COUNT; i++) {
 		enemies[i].position.x -= world_movement.x;
 		enemies[i].position.y -= world_movement.y;
-		move_sprite(enemies[i].sprite_index, enemies[i].position.x, enemies[i].position.y);
+		// We don't need to update the position of the sprite as it will be done later
+		// move_sprite(enemies[i].sprite_index, enemies[i].position.x, enemies[i].position.y);
 	}
 
 	for (uint8_t i = 0; i < PLAYER_BULLET_COUNT; i++) {
 		if (!player_bullets[i].enabled) continue;
 		player_bullets[i].position.x -= world_movement.x;
 		player_bullets[i].position.y -= world_movement.y;
-		move_sprite(player_bullets[i].sprite_index, player_bullets[i].position.x,
-					player_bullets[i].position.y);
+		// We don't need to update the position of the sprite as it will be done later
+		// move_sprite(player_bullets[i].sprite_index, player_bullets[i].position.x,
+		// 			player_bullets[i].position.y);
 	}
 
 	for (uint8_t i = 0; i < ENEMY_BULLET_COUNT; i++) {
 		if (!enemy_bullets[i].enabled) continue;
 		enemy_bullets[i].position.x -= world_movement.x;
 		enemy_bullets[i].position.y -= world_movement.y;
-		move_sprite(enemy_bullets[i].sprite_index, enemy_bullets[i].position.x,
-					enemy_bullets[i].position.y);
+		// We don't need to update the position of the sprite as it will be done later
+		// move_sprite(enemy_bullets[i].sprite_index, enemy_bullets[i].position.x,
+		// 			enemy_bullets[i].position.y);
 	}
 }
 
@@ -217,7 +218,7 @@ void update_enemy_rotation(GameObject* enemy) {
 
 void update_enemy_position(GameObject* enemy) {
 	Vector8 enemy_movement = {0, 0};
-	enemy_movement = movement_from_velocity(enemy);
+	movement_from_velocity(enemy, &enemy_movement);
 	enemy->position.x += enemy_movement.x;
 	enemy->position.y += enemy_movement.y;
 	move_sprite(enemy->sprite_index, enemy->position.x, enemy->position.y);
@@ -250,7 +251,7 @@ void update_bullet_position(GameObject* bullet) {
 	if (!bullet->enabled) return;
 
 	Vector8 bullet_movement = {0, 0};
-	bullet_movement = movement_from_velocity(bullet);
+	movement_from_velocity(bullet, &bullet_movement);
 	bullet->position.x += bullet_movement.x * 2;
 	bullet->position.y += bullet_movement.y * 2;
 
