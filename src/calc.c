@@ -51,7 +51,7 @@ void movement_from_velocity(GameObject* gameObject, Vector8* gameObject_movement
 									VELOCITIES[(gameObject->rotation + 4) & 7]};
 
 	// Check if supposed to move on a given axis this frame
-	if (gameObject->rotation % 4 == 2) { // If player is facing diagonally
+	if ((gameObject->rotation & 3) == 2) { // If player is facing diagonally
 		// Sync x and y movement counters
 		if (gameObject->movement_counter.x != gameObject->movement_counter.y) {
 			gameObject->movement_counter.y = gameObject->movement_counter.x;

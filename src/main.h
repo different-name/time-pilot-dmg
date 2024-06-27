@@ -19,10 +19,9 @@
 #define ENEMY_SPRITE_INDEX (PLAYER_SPRITE_INDEX + 1)
 #define BULLET_SPRITE_INDEX (ENEMY_SPRITE_INDEX + ENEMY_COUNT)
 
-#define MIN_POS_X 1
-#define MAX_POS_X 167
+#define MAX_POS_X 168
 #define MIN_POS_Y 8
-#define MAX_POS_Y 159
+#define MAX_POS_Y 160
 
 typedef struct {
 	int8_t x;
@@ -60,6 +59,7 @@ void update_player_rotation(void);
 uint8_t get_dpad_direction(void);
 void update_player_position(void);
 
+void spawn_enemy(void);
 void update_enemy_rotation(GameObject* enemy);
 void update_enemy_position(GameObject* enemy);
 

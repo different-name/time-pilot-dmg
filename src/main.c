@@ -116,13 +116,13 @@ void game_loop(void) {
 	for (uint8_t i = 0; i < ENEMY_COUNT; i++) {
 		if (!enemies[i].enabled) continue; // Don't process enemy if disabled
 
-		if ((sys_time + i) % 4 == 0) { // Update rotation every 5 frames
+		if ((((uint8_t)sys_time + i) & 3) == 0) { // Update rotation every 5 frames
 			update_enemy_rotation(&enemies[i]);
 		}
-		if ((sys_time + i) % 2 == 0) { // Update position every 2 frames
+		if ((((uint8_t)sys_time + i) & 1) == 0) { // Update position every 2 frames
 			update_enemy_position(&enemies[i]);
 		}
-		if ((sys_time + i * 64) % 256 == 0) { // Shoot every 256 frames
+		if (((sys_time + i * 64) & 255) == 0) { // Shoot every 256 frames
 			spawn_bullet(&enemies[i], enemy_bullets, false);
 		}
 	}
@@ -182,10 +182,26 @@ void update_player_position(void) {
 	movement_from_velocity(&(player.gameObject), &world_movement);
 
 	for (uint8_t i = 0; i < ENEMY_COUNT; i++) {
-		enemies[i].position.x -= world_movement.x;
-		enemies[i].position.y -= world_movement.y;
+		if (!enemies[i].enabled) {
+			spawn_enemy();
+			continue;
+		};
+
+		GameObject* enemy = &enemies[i];
+
+		enemy->position.x -= world_movement.x;
+		enemy->position.y -= world_movement.y;
+
+		if (enemy->position.x > MAX_POS_X || enemy->position.y < MIN_POS_Y ||
+			enemy->position.y > MAX_POS_Y) {
+			enemy->enabled = false;
+		}
+
 		// We don't need to update the position of the sprite as it will be done later
-		// move_sprite(enemies[i].sprite_index, enemies[i].position.x, enemies[i].position.y);
+		// Unless the enemy will be skipped this frame
+		if (((sys_time + i) & 1) != 0) {
+			move_sprite(enemies[i].sprite_index, enemies[i].position.x, enemies[i].position.y);
+		}
 	}
 
 	for (uint8_t i = 0; i < PLAYER_BULLET_COUNT; i++) {
@@ -207,7 +223,22 @@ void update_player_position(void) {
 	}
 }
 
+void spawn_enemy(void) {
+	for (uint8_t i = 0; i < ENEMY_COUNT; i++) {
+		if (enemies[i].enabled) continue;
+
+		GameObject* enemy = &enemies[i];
+
+		enemy->position.x = PLAYER_X;
+		enemy->position.y = MIN_POS_Y + 10;
+		enemy->rotation = 8;
+		enemy->enabled = true;
+	}
+}
+
 void update_enemy_rotation(GameObject* enemy) {
+	if (!enemy->enabled) return;
+
 	// Retrieve current direction the enemy is in
 	int8_t target_direction = direction_to_point(&(enemy->position), &player.gameObject.position);
 
@@ -217,6 +248,8 @@ void update_enemy_rotation(GameObject* enemy) {
 }
 
 void update_enemy_position(GameObject* enemy) {
+	if (!enemy->enabled) return;
+
 	Vector8 enemy_movement = {0, 0};
 	movement_from_velocity(enemy, &enemy_movement);
 	enemy->position.x += enemy_movement.x;
@@ -255,8 +288,8 @@ void update_bullet_position(GameObject* bullet) {
 	bullet->position.x += bullet_movement.x * 2;
 	bullet->position.y += bullet_movement.y * 2;
 
-	if (bullet->position.x < MIN_POS_X || bullet->position.x > MAX_POS_X ||
-		bullet->position.y < MIN_POS_Y || bullet->position.y > MAX_POS_Y) {
+	if (bullet->position.x > MAX_POS_X || bullet->position.y < MIN_POS_Y ||
+		bullet->position.y > MAX_POS_Y) {
 		bullet->enabled = false;
 	}
 
