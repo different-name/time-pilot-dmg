@@ -1,7 +1,7 @@
 # Time Pilot
 
-A GameBoy version of Konami's 1982 Time Pilot
+My port of Konami's Time Pilot to the original Game Boy
 
-## Dependencies
+## Acknowledgements
 
 - [gbdk-2020](https://github.com/gbdk-2020/gbdk-2020)
